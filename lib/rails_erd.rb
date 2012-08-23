@@ -1,4 +1,4 @@
-require "active_support/ordered_options"
+require "active_support"
 require "rails_erd/railtie" if defined? Rails
 
 # Welcome to the API documentation of Rails ERD. If you wish to extend or
@@ -63,4 +63,14 @@ module RailsERD
     :exclude, nil,
     :only, nil
   ]
+end
+
+class Class
+  def descendants
+    descendants = []
+      ObjectSpace.each_object(class << self; self; end) do |k|
+        descendants.unshift k unless k == self
+      end
+    descendants
+  end
 end

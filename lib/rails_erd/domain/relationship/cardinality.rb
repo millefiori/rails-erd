@@ -5,7 +5,7 @@ module RailsERD
         extend Inspectable
         inspection_attributes :source_range, :destination_range
 
-        N = Infinity = 1.0/0 # And beyond.
+        N = Infinity = 2
 
         CLASSES = {
           [1, 1] => :one_to_one,

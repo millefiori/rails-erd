@@ -44,7 +44,10 @@ module RailsERD
       # either have a presence validation (+validates_presence_of+), or have a
       # <tt>NOT NULL</tt> database constraint.
       def mandatory?
-        !column.null or @model.validators_on(name).map(&:kind).include?(:presence)
+        validations = @model.reflect_on_validations_for(column.name)
+        validation_types = validations.map(&:macro)
+
+        !column.null || validation_types.include?(:validates_presence_of)
       end
 
       # Returns +true+ if this attribute is the primary key of the entity.
