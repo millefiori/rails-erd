@@ -70,8 +70,8 @@ module RailsERD
       # Generates a new domain model based on all <tt>ActiveRecord::Base</tt>
       # subclasses, and creates a new diagram. Use the given options for both
       # the domain generation and the diagram generation.
-      def create(options = {})
-        new(Domain.generate(options), options).create
+      def create(models, options = {})
+        new(Domain.generate(models, options), options).create
       end
 
       protected

@@ -23,8 +23,8 @@ module RailsERD
       #
       # The +options+ hash allows you to override the default options. For a
       # list of available options, see RailsERD.
-      def generate(options = {})
-        new ActiveRecord::Base.descendants, options
+      def generate(models, options = {})
+        new models, options
       end
 
       # Returns the method name to retrieve the foreign key from an
@@ -49,7 +49,6 @@ module RailsERD
     # Returns the domain model name, which is the name of your Rails
     # application or +nil+ outside of Rails.
     def name
-      defined? Rails and Rails.application and Rails.application.class.parent.name
     end
 
     # Returns all entities of your domain model.
@@ -98,8 +97,11 @@ module RailsERD
     def relationships_mapping
       @relationships_mapping ||= {}.tap do |mapping|
         relationships.each do |relationship|
-          (mapping[relationship.source.name] ||= []) << relationship
-          (mapping[relationship.destination.name] ||= []) << relationship
+          if relationship.source && relationship.destination
+            (mapping[relationship.source.name] ||= []) << relationship
+
+            (mapping[relationship.destination.name] ||= []) << relationship
+          end
         end
       end
     end
