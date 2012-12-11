@@ -157,9 +157,14 @@ module RailsERD
               if range.min == range.max
                 "#{range.min}"
               else
-                "#{range.min}..#{range.max == Domain::Relationship::N ? "∗" : range.max}"
+                if range.max == Domain::Relationship::N
+                  "#{range.min}..*"
+                else
+                  "#{range.min}..#{range.max}"
+                end
               end
             end
+
             options[:headlabel], options[:taillabel] = *ranges
           end
         end
@@ -210,6 +215,9 @@ module RailsERD
 
       each_relationship do |relationship|
         from, to = relationship.source, relationship.destination
+        next unless from && to
+        next if from == to
+
         unless draw_edge from.name, to.name, relationship_options(relationship)
           if from.children.any?
             from.children.each do |child|
@@ -258,8 +266,28 @@ module RailsERD
       end
 
       def entity_options(entity, attributes)
-        label = options[:markup] ? "<#{read_template(:html).result(binding)}>" : "#{read_template(:record).result(binding)}"
-        entity_style(entity, attributes).merge :label => label
+        if options[:markup]
+          label = "<#{read_template(:html).result(binding)}>"
+        else
+          label = "#{read_template(:record).result(binding)}"
+        end
+
+        coloring = {
+          :color => "black",
+          :fillcolor => "white",
+          :fontcolor => "black"
+        }
+
+        if options[:center] && options[:center] == entity.model
+          coloring[:fillcolor] = "gray33"
+          coloring[:fontcolor] = "white"
+          coloring[:style] = "filled"
+        end
+
+
+        opts = { :label => label }.merge(coloring)
+
+        entity_style(entity, attributes).merge(opts)
       end
 
       def relationship_options(relationship)

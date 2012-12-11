@@ -18,6 +18,23 @@ module RailsERD
           assoc_groups.collect { |_, assoc_group| new(domain, assoc_group.to_a) }
         end
 
+        def classes_associated_with(klass)
+          klasses = klass.reflect_on_all_associations.map do |assoc|
+            [association_owner(assoc), association_target(assoc)]
+          end
+
+          class_constants = (klasses.flatten << klass).uniq.map do |class_name|
+            begin
+              class_name.constantize
+            rescue => e
+              warn e.message
+              nil
+            end
+          end
+
+          class_constants.compact
+        end
+
         private
 
         def association_identity(association)
@@ -40,7 +57,16 @@ module RailsERD
         end
 
         def association_target(association)
-          association.options[:polymorphic] ? association.class_name : association.klass.name
+          begin
+            association.options[:polymorphic] ? association.class_name : association.klass.name
+          rescue => e
+            raise e unless association.respond_to?(:source_reflection_names)
+
+            reflection_names = association.source_reflection_names
+            as_class = lambda { |name| name.to_s.classify.constantize }
+
+            return reflection_names.map(&as_class).uniq.first
+          end
         end
       end
 
@@ -169,20 +195,28 @@ module RailsERD
       end
 
       def association_minimum(association)
-        minimum = association_validators(:presence, association).any? ||
+        minimum = association_validators(:validates_presence_of, association).any? ||
           foreign_key_required?(association) ? 1 : 0
-        length_validators = association_validators(:length, association)
+        length_validators = association_validators(:validates_length_of, association)
         length_validators.map { |v| v.options[:minimum] }.compact.max or minimum
       end
 
       def association_maximum(association)
-        maximum = association.collection? ? N : 1
-        length_validators = association_validators(:length, association)
+        if [:has_many, :has_and_belongs_to_many].include?(association.macro)
+          maximum = N
+        else
+          maximum = 1
+        end
+
+        length_validators = association_validators(:validates_length_of, association)
         length_validators.map { |v| v.options[:maximum] }.compact.min or maximum
       end
 
       def association_validators(kind, association)
-        association.active_record.validators_on(association.name).select { |v| v.kind == kind }
+        model = association.active_record
+        validations = model.reflect_on_validations_for(association.name)
+
+        validations.select { |v| v.macro == kind }
       end
 
       def any_habtm?(associations)

@@ -47,6 +47,11 @@ Choice.options do
     desc "Omit entities without relationships."
   end
 
+  option :models do
+    long '--models *MODELS'
+    desc "Restrict the visualization to certain models"
+  end
+
   separator ""
   separator "Output options:"
 
@@ -104,7 +109,7 @@ module RailsERD
     class << self
       def start
         path = Choice.rest.first || Dir.pwd
-        options = Choice.choices.each_with_object({}) do |(key, value), opts|
+        options = Choice.choices.reduce({}) do |opts, (key, value)|
           if key.start_with? "no_"
             opts[key.gsub("no_", "").to_sym] = !value
           elsif value.to_s.include? ","
@@ -112,7 +117,14 @@ module RailsERD
           else
             opts[key.to_sym] = value
           end
+          opts
         end
+
+        if options[:models]
+          suffix = "-" + options[:models].join('+')
+          options[:filename] << suffix
+        end
+
         new(path, options).start
       end
     end
@@ -127,7 +139,7 @@ module RailsERD
       create_diagram
     rescue Exception => e
       $stderr.puts "Failed: #{e.class}: #{e.message}"
-      $stderr.puts e.backtrace.map { |t| "    from #{t}" } if options[:debug]
+      $stderr.puts e.backtrace.map { |t| "    from #{t}" }
     end
 
     private
@@ -136,12 +148,30 @@ module RailsERD
       $stderr.puts "Loading application in '#{File.basename(path)}'..."
       # TODO: Add support for different kinds of environment.
       require "#{path}/config/environment"
-      Rails.application.eager_load!
+      Dir[File.join(Rails.root, 'app', 'models', '**', '*.rb')].each do |model|
+        require model
+      end
     end
 
     def create_diagram
-      $stderr.puts "Generating entity-relationship diagram for #{ActiveRecord::Base.descendants.length} models..."
-      file = RailsERD::Diagram::Graphviz.create(options)
+      models = ActiveRecord::Base.descendants
+
+      if options[:models]
+        options[:center] = options[:models].first.classify.constantize
+
+        restriction = lambda do |model|
+          options[:models].any? { |m| model.to_s.downcase.include?(m.downcase) }
+        end
+
+        associated = lambda do |model|
+          RailsERD::Domain::Relationship.classes_associated_with(model)
+        end
+
+        models = models.select(&restriction).map(&associated).flatten.uniq
+      end
+
+      $stderr.puts "Generating entity-relationship diagrams"
+      file = RailsERD::Diagram::Graphviz.create(models, options)
       $stderr.puts "Diagram saved to '#{file}'."
       `open #{file}` if options[:open]
     end
